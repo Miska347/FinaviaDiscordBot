@@ -17,7 +17,9 @@ Uses Finavia Public Flights, V0 API
 ## Installation: 
 
 - Clone/Download the repository 
+```
     git clone https://github.com/MiskaVou/FinaviaDiscordBot.git
+```
 - Create a Discord bot in Discord Developer Portal 
     - Enable all Priviledged Gateway Intents
     - Get your bot token
@@ -26,7 +28,11 @@ Uses Finavia Public Flights, V0 API
 - Setup .env file
     - Fill up your Discord bot token, Finavia app_id and app_key, Default airport to monitor, Your Discord User ID, Your Discord Server (Guild) ID, Your Discord Channel ID
 - Install all the requirements with command:
+```
     pip install -r requirements.txt
+```
 - Run the bot with command:
+```
     python3 main.py
+```
 
