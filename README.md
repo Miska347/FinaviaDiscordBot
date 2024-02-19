@@ -8,6 +8,7 @@ Uses Finavia Public Flights, V0 API
 - Send announcement to discord server or user via DM. (Can be toggled ON/OFF)
 - Set notifications (special customizable message) when aircraft type is something else than the airports usual (for example ATRs) (Can be toggled ON/OFF)
 - Send message only about flights that haven't been announced before. (Can be toggled ON/OFF)
+- Setting changes made with commands are saved to config file (.env)
 
 ## Commands:
 
