@@ -21,6 +21,9 @@ base_api_url = os.getenv("BASE_API_URL")
 
 usual_aircrafts = os.getenv("USUAL_AIRCRAFTS")
 
+show_always_all_flights = os.getenv("SHOW_ALWAYS_ALL_FLIGHTS")
+
+
 previous_data = []
 
 intents = discord.Intents.all()
@@ -67,7 +70,7 @@ async def refresh(interaction: discord.Interaction):
 
     await send_flight_data()
 
-    await interaction.followup.send(f'Refreshed')
+    await interaction.followup.send(f'Refreshed.')
 
 
 @client.tree.command(name="previous", description='See previous data')
@@ -76,6 +79,15 @@ async def previous(interaction: discord.Interaction):
 
     await interaction.followup.send(f'{previous_data}')
 
+
+@client.tree.command(name="clear", description='Clear data')
+async def refresh(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    global previous_data
+    previous_data = []
+
+    await interaction.followup.send(f'Cleared.')
 
 # Aseta API
 api_url = f"{base_api_url}{airport_code}"
@@ -166,66 +178,48 @@ async def send_flight_data():
     data = get_flight_data()
     message_no_data = f"No data found for the selected airport ({airport_code}) (no traffic?)"
     print("Data:", data)
-    
+
     if data:
-        # Luo tyhjä embed
+        # Create an empty embed
         embed = discord.Embed(title=f"New flights ({airport_code})", color=0x00ff00)
         embed.set_footer(text=f"{airport_code} Airport | Data from Finavia")
 
-        # Vertaa uutta dataa edelliseen dataan
-        new_flights = [message for message in data if message not in previous_data]
+        # Check if you want to show all flights always
+        if show_always_all_flights:
+            new_flights = data
+        else:
+            # Compare new data with previous data
+            new_flights = [message for message in data if message not in previous_data]
 
         if not new_flights:
             # No new flights, update the embed accordingly
             embed.description = "**No new flights found.**"
         else:
             for message in new_flights:
-                # Lisää lennon tiedot embediin
+                # Add flight information to the embed
                 embed.add_field(
                     name=f"Flight: {message['fltnr']} / {message['callsign']}",
                     value=f"Route: {message['h_apt']} -> {message['route_1']}\nTime: {message['sdt_timestamp_str_local']} UTC+2\nA/C: {message['actype']} ({message['acreg']})",
                     inline=False
                 )
 
-        # Tallenna uusi tila (data)
+        # Save the new state (data)
         previous_data = data
 
-
-            # Hae kuvan URL rekisteritunnuksen perusteella ja lisää se Embediin
-            #image_url = await get_aircraft_image(message['acreg'])
-            #if image_url:
-            #    embed.set_thumbnail(url=image_url)
-
-        # Lisää maininta kaikille, jos lentokoneet eivät ole tietyn tyyppisiä
-        if any(message['actype'] not in usual_aircrafts for message in data):
-
-            notificationmessage_user = f"Some special aircrafts coming! <@{your_discord_id}> \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
-            notificationmessage_server = f"Some special aircrafts coming! @everyone \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
-
-            #Poistetaan ylimääräisiä merkkejä
-            notificationmessage_user = notificationmessage_user.replace("[", "").replace("]", "").replace("'", "")
-            notificationmessage_server = notificationmessage_server.replace("[", "").replace("]", "").replace("'", "")
-
-            user = await client.fetch_user(your_discord_id)
-            await user.send(notificationmessage_user)
-
-            channel = client.get_channel(your_channel_id)
-            await channel.send(notificationmessage_server)
-
-        # Lähetä embed yksityisviestinä
+        # Send the embed as a private message
         user = await client.fetch_user(your_discord_id)
         await user.send(embed=embed)
 
-        # Hae palvelin + kanava ja lähetä embed myös kanavalle
+        # Get the server + channel and send the embed to the channel as well
         channel = client.get_channel(your_channel_id)
         await channel.send(embed=embed)
     else:
-        print("Ei voitu lähettää tietoja, koska API-haku epäonnistui tai dataa ei löytynyt. Lähetetään virheviesti")
-        # Lähetä viesti yksityisviestinä
+        print("Could not send data because API request failed or no data found. Sending error message")
+        # Send a message as a private message
         user = await client.fetch_user(your_discord_id)
         await user.send(message_no_data)
 
-        # Hae kanava ja lähetä viesti myös kanavalle
+        # Get the channel and send the message to the channel as well
         channel = client.get_channel(your_channel_id)
         await channel.send(message_no_data)
 
