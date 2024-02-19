@@ -3,6 +3,7 @@ import requests
 import xml.etree.ElementTree as ET
 import os
 from dotenv import load_dotenv
+from dotenv import set_key
 from discord.ext import commands, tasks
 from discord import app_commands
 from datetime import datetime
@@ -45,9 +46,27 @@ async def set_airport(ctx: commands.Context, new_airport_code: str):
     api_url = f"{base_api_url}{airport_code}"
 
     # Vastaus slash-komennolle
-    await ctx.followup.send(f'Selected airport: {new_airport_code}')
+    await ctx.followup.send(f'## :gear: Setting changed and updated to config: \nSelected airport: **{new_airport_code}**')
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{airport_code} lentoasema"))
+
+    set_key('.env', 'AIRPORT_CODE', new_airport_code)
+
+
+@client.tree.command(name='showall', description='Send message only about flights that havent been announced before.')
+@app_commands.describe(showall="True / False")
+async def showall(ctx: commands.Context, showall: str):
+
+    await ctx.response.defer(ephemeral=True)
+    
+    # Päivitetään airport code ja api url kaikkialle
+    global show_always_all_flights
+    show_always_all_flights = showall
+
+    # Vastaus slash-komennolle
+    await ctx.followup.send(f'## :gear: Setting changed and updated to config: \nSend message only about flights that havent been announced before: **{showall}**')
+
+    set_key('.env', 'SHOW_ALWAYS_ALL_FLIGHTS', showall)
 
 
 @client.tree.command(name="status", description='Shows selected airport, HTTP-request status, ping')
@@ -81,7 +100,7 @@ async def previous(interaction: discord.Interaction):
 
 
 @client.tree.command(name="clear", description='Clear data')
-async def refresh(interaction: discord.Interaction):
+async def clear(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
     global previous_data
