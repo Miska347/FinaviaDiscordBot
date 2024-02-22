@@ -225,6 +225,29 @@ async def send_flight_data():
         # Save the new state (data)
         previous_data = data
 
+            # Hae kuvan URL rekisteritunnuksen perusteella ja lisää se Embediin
+            #image_url = await get_aircraft_image(message['acreg'])
+            #if image_url:
+            #    embed.set_thumbnail(url=image_url)
+
+        # Lisää maininta kaikille, jos lentokoneet eivät ole tietyn tyyppisiä
+        if any(message['actype'] not in usual_aircrafts for message in data):
+
+            notificationmessage_user = f"Some special aircrafts coming! <@{your_discord_id}> \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
+            notificationmessage_server = f"Some special aircrafts coming! @everyone \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
+
+            #Poistetaan ylimääräisiä merkkejä
+            notificationmessage_user = notificationmessage_user.replace("[", "").replace("]", "").replace("'", "")
+            notificationmessage_server = notificationmessage_server.replace("[", "").replace("]", "").replace("'", "")
+
+            user = await client.fetch_user(your_discord_id)
+            await user.send(notificationmessage_user)
+
+            channel = client.get_channel(your_channel_id)
+            await channel.send(notificationmessage_server)
+
+        # Lähetä embed yksityisviestinä
+
         # Send the embed as a private message
         user = await client.fetch_user(your_discord_id)
         await user.send(embed=embed)
