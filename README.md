@@ -6,7 +6,7 @@ Uses Finavia Public Flights, V0 API
 
 - Announce new flights to selected Finavia airport (you can set your own checking interval)
 - Send announcement to discord server or user via DM. (Can be toggled ON/OFF)
-- Set notifications (special customizable message) when aircraft type is something else than the airports usual (for example ATRs) (Can be toggled ON/OFF)
+- Set notifications (special customizable message) when aircraft types are something else than the airports usual (for example ATRs) (Can be toggled ON/OFF)
 - Send message only about flights that haven't been announced before. (Can be toggled ON/OFF)
 - Setting changes made with commands are saved to config file (.env)
 
