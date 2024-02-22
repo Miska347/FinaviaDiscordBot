@@ -16,6 +16,7 @@ Uses Finavia Public Flights, V0 API
 - /status - Check selected airport (can be seen also in the bot's status), HTTP-request status and ping
 - /refresh - Refresh airport data manually
 - /clear - Clear flights history. Useful if you get messages only about flights that haven't been announced before, so you can get the full flights list with using first /clear and then /refresh
+- /only_new_flights - Send message only about flights that haven't been announced before or always show all flights that are coming (True = Shows only new flights / False = Shows all flights)
 
 ## Installation: 
 
