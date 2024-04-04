@@ -20,7 +20,7 @@ Uses Finavia Public Flights, V0 API
 - /clear - Clear flights history. Useful if you get messages only about flights that haven't been announced before, so you can get the full flights list with using first /clear and then /refresh
 - /only_new_flights - Send message only about flights that haven't been announced before or always show all flights that are coming (True = Shows only new flights / False = Shows all flights)
 - /notify_special - Send notifications when aircraft types are something else than the airports usual (True = Notification sent when new "special" flight is found / False = No notification about "special" flights)
-- 
+  
 ![Finavia Discord Bot Preview 2](https://i.imgur.com/uTncS5m.png)
 
 ## Installation: 
