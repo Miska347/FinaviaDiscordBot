@@ -20,12 +20,15 @@ api_key = os.getenv("API_KEY")
 airport_code = os.getenv("AIRPORT_CODE")
 base_api_url = os.getenv("BASE_API_URL")
 
-usual_aircrafts = os.getenv("USUAL_AIRCRAFTS")
+notify_special = os.getenv("NOTIFY_SPECIAL").lower() == "true"
+not_special_ac = os.getenv("NOT_SPECIAL_AC")
 
-show_always_all_flights = os.getenv("SHOW_ALWAYS_ALL_FLIGHTS")
+show_only_new_flights = os.getenv("SHOW_ONLY_NEW_FLIGHTS").lower() == "true"
+
+check_interval = os.getenv("CHECK_INTERVAL")
 
 
-previous_data = []
+previous_data = {'departures': [], 'arrivals': []}
 
 intents = discord.Intents.all()
 intents.messages = True
@@ -53,20 +56,32 @@ async def set_airport(ctx: commands.Context, new_airport_code: str):
     set_key('.env', 'AIRPORT_CODE', new_airport_code)
 
 
-@client.tree.command(name='showall', description='Send message only about flights that havent been announced before.')
-@app_commands.describe(showall="True / False")
-async def showall(ctx: commands.Context, showall: str):
-
+@client.tree.command(name='only_new_flights', description='Send message only about flights that havent been announced before.')
+@app_commands.describe(only_new_flights="True / False")
+async def only_new_flights(ctx: commands.Context, only_new_flights: str):
     await ctx.response.defer(ephemeral=True)
     
-    # Päivitetään airport code ja api url kaikkialle
-    global show_always_all_flights
-    show_always_all_flights = showall
+    global show_only_new_flights
+    show_only_new_flights = only_new_flights.lower() == "true"
 
-    # Vastaus slash-komennolle
-    await ctx.followup.send(f'## :gear: Setting changed and updated to config: \nSend message only about flights that havent been announced before: **{showall}**')
+    await ctx.followup.send(f'## :gear: Setting changed and updated to config: \nSend message only about flights that havent been announced before: **{only_new_flights}**')
 
-    set_key('.env', 'SHOW_ALWAYS_ALL_FLIGHTS', showall)
+    set_key('.env', 'SHOW_ONLY_NEW_FLIGHTS', only_new_flights.lower())
+
+
+
+@client.tree.command(name='notify_special', description='Send message only about flights that havent been announced before.')
+@app_commands.describe(notify_special_ac="True / False")
+async def notify_specialcommand(ctx: commands.Context, notify_special_ac: str):
+    await ctx.response.defer(ephemeral=True)
+    
+    global notify_special
+    notify_special = notify_special_ac.lower() == "true"
+
+    await ctx.followup.send(f'## :gear: Setting changed and updated to config: \nSend notification about special aircrafts: **{notify_special_ac}**')
+
+    set_key('.env', 'NOTIFY_SPECIAL', notify_special_ac.lower())
+
 
 
 @client.tree.command(name="status", description='Shows selected airport, HTTP-request status, ping')
@@ -117,6 +132,7 @@ headers = {
     'app_key': api_key
 }
 
+
 # Funktio tiedon hakemiseksi API:sta
 def get_flight_data():
     try:
@@ -133,16 +149,13 @@ def get_flight_data():
         # Ota huomioon XML-namespace
         ns = {'flights': 'http://www.finavia.fi/FlightsService.xsd'}
 
-        # Etsi departure- ja arrival-lennot
+        # Etsi departure- ja arrival-lennot erikseen
         departure_flights = root.findall('.//flights:dep/flights:body/flights:flight', namespaces=ns)
         arrival_flights = root.findall('.//flights:arr/flights:body/flights:flight', namespaces=ns)
 
-        # Yhdistä lennot yhteen listalle
-        all_flights = departure_flights + arrival_flights
-
-        # Valitse tarvittavat tiedot
-        flights = []
-        for flight in all_flights:
+        # Valitse tarvittavat tiedot departure-lennoista
+        departure_data = []
+        for flight in departure_flights:
             fltnr = flight.find('flights:fltnr', namespaces=ns).text
             sdt = flight.find('flights:sdt', namespaces=ns).text
             callsign = flight.find('flights:callsign', namespaces=ns).text
@@ -154,89 +167,109 @@ def get_flight_data():
             # Muuta aika timestamp-muotoon Suomen aikavyöhykkeelle ja UTC +0
             sdt_timestamp_utc = datetime.fromisoformat(sdt[:-1])  # Poista 'Z' lopusta
             sdt_timestamp_utc = sdt_timestamp_utc.replace(tzinfo=pytz.utc)
-            sdt_timestamp_str_utc = f"<t:{int(sdt_timestamp_utc.timestamp())}:f> <t:{int(sdt_timestamp_utc.timestamp())}:R>"
+            sdt_timestamp_str_local = f"<t:{int(sdt_timestamp_utc.timestamp())}:f> <t:{int(sdt_timestamp_utc.timestamp())}:R>"
 
-            sdt_timestamp_local = sdt_timestamp_utc.astimezone(pytz.timezone('Europe/Helsinki'))
-            sdt_timestamp_str_local = f"<t:{int(sdt_timestamp_local.timestamp())}:f> <t:{int(sdt_timestamp_local.timestamp())}:R>"
+            departure_data.append({
+                'fltnr': fltnr,
+                'sdt_timestamp_str_local': sdt_timestamp_str_local,
+                'callsign': callsign,
+                'acreg': acreg,
+                'actype': actype,
+                'h_apt': h_apt,
+                'route_1': route_1
+            })
 
-            # Tarkista, onko lento <dep> vai <arr>
-            is_departure = flight.tag.endswith('dep')
+        # Valitse tarvittavat tiedot arrival-lennoista
+        arrival_data = []
+        for flight in arrival_flights:
+            fltnr = flight.find('flights:fltnr', namespaces=ns).text
+            sdt = flight.find('flights:sdt', namespaces=ns).text
+            callsign = flight.find('flights:callsign', namespaces=ns).text
+            acreg = flight.find('flights:acreg', namespaces=ns).text
+            actype = flight.find('flights:actype', namespaces=ns).text
+            h_apt = flight.find('flights:h_apt', namespaces=ns).text
+            route_1 = flight.find('flights:route_1', namespaces=ns).text
 
-            # Muodosta viesti
-            if is_departure:
-                message = f"Lento: {fltnr} / {callsign}. Reitti: {h_apt} -> {route_1} (Saapuu: {sdt_timestamp_str_local} UTC+2) Kone: {actype} ({acreg})"
-            else:
-                message = f"Lento: {fltnr} / {callsign}. Reitti: {route_1} -> {h_apt} (Lähtee: {sdt_timestamp_str_local} UTC+2) Kone: {actype} ({acreg})"
+            # Muuta aika timestamp-muotoon Suomen aikavyöhykkeelle ja UTC +0
+            sdt_timestamp_utc = datetime.fromisoformat(sdt[:-1])  # Poista 'Z' lopusta
+            sdt_timestamp_utc = sdt_timestamp_utc.replace(tzinfo=pytz.utc)
+            sdt_timestamp_str_local = f"<t:{int(sdt_timestamp_utc.timestamp())}:f> <t:{int(sdt_timestamp_utc.timestamp())}:R>"
 
+            arrival_data.append({
+                'fltnr': fltnr,
+                'sdt_timestamp_str_local': sdt_timestamp_str_local,
+                'callsign': callsign,
+                'acreg': acreg,
+                'actype': actype,
+                'h_apt': h_apt,
+                'route_1': route_1
+            })
 
-            flights.append({
-            'fltnr': fltnr,
-            'sdt_timestamp_str_local': sdt_timestamp_str_local,
-            'callsign': callsign,
-            'acreg': acreg,
-            'actype': actype,
-            'h_apt': h_apt,
-            'route_1': route_1
-    })
-
-        return flights
+        return departure_data, arrival_data
 
     except requests.exceptions.RequestException as err:
         print(f"Virhe HTTP-pyynnössä: {err}")
-        return None
+        return None, None
     except Exception as e:
         print(f"Jokin meni pieleen: {e}")
-        return None
+        return None, None
 
 
-# Ajastin hakee tiedot ja lähettää ne yksityisviestinä Discordissa ja kanavalle
-@tasks.loop(hours=1)
+@tasks.loop(minutes=float(check_interval))
 async def send_flight_data():
     global previous_data
 
-    data = get_flight_data()
+    departure_data, arrival_data = get_flight_data()
     message_no_data = f"No data found for the selected airport ({airport_code}) (no traffic?)"
-    print("Data:", data)
 
-    if data:
+    if departure_data or arrival_data:
         # Create an empty embed
         embed = discord.Embed(title=f"New flights ({airport_code})", color=0x00ff00)
-        embed.set_footer(text=f"{airport_code} Airport | Data from Finavia")
+        embed.set_footer(text=f"{airport_code} Airport | Finland Time | Data from Finavia")
 
         # Check if you want to show all flights always
-        if show_always_all_flights:
-            new_flights = data
+        if show_only_new_flights:
+            new_departure_flights = [message for message in departure_data if message not in previous_data['departures']]
+            new_arrival_flights = [message for message in arrival_data if message not in previous_data['arrivals']]
         else:
-            # Compare new data with previous data
-            new_flights = [message for message in data if message not in previous_data]
-
-        if not new_flights:
+            new_departure_flights = departure_data
+            new_arrival_flights = arrival_data
+            
+        if not new_departure_flights and not new_arrival_flights:
             # No new flights, update the embed accordingly
             embed.description = "**No new flights found.**"
         else:
-            for message in new_flights:
-                # Add flight information to the embed
-                embed.add_field(
-                    name=f"Flight: {message['fltnr']} / {message['callsign']}",
-                    value=f"Route: {message['h_apt']} -> {message['route_1']}\nTime: {message['sdt_timestamp_str_local']} UTC+2\nA/C: {message['actype']} ({message['acreg']})",
-                    inline=False
-                )
+            if new_arrival_flights:
+                # Add "ARRIVALS" section to the embed
+                embed.add_field(name="ARRIVALS:", value="\u200b", inline=False)
+                # Add arrival flight information to the embed under "ARRIVALS" section
+                for message in new_arrival_flights:
+                    embed.add_field(
+                        name=f"🛬 {message['fltnr']} / {message['callsign']}",
+                        value=f"Route: {message['route_1']} -> {message['h_apt']}\nTime: {message['sdt_timestamp_str_local']}\nA/C: {message['actype']} ({message['acreg']})",
+                        inline=False
+                    )
+
+            if new_departure_flights:
+                # Add "DEPARTURES" section to the embed
+                embed.add_field(name="DEPARTURES:", value="\u200b", inline=False)
+                # Add departure flight information to the embed under "DEPARTURES" section
+                for message in new_departure_flights:
+                    embed.add_field(
+                        name=f"🛫 {message['fltnr']} / {message['callsign']}",
+                        value=f"Route: {message['h_apt']} -> {message['route_1']}\nTime: {message['sdt_timestamp_str_local']}\nA/C: {message['actype']} ({message['acreg']})",
+                        inline=False
+                    )
 
         # Save the new state (data)
-        previous_data = data
+        previous_data['departures'] = departure_data
+        previous_data['arrivals'] = arrival_data
 
-            # Hae kuvan URL rekisteritunnuksen perusteella ja lisää se Embediin
-            #image_url = await get_aircraft_image(message['acreg'])
-            #if image_url:
-            #    embed.set_thumbnail(url=image_url)
+        # Add special aircrafts notification
+        if (new_departure_flights or new_arrival_flights) and notify_special is True and any(message['actype'] not in not_special_ac for message in departure_data + arrival_data):
+            notificationmessage_user = f"## Some special aircrafts coming! <@{your_discord_id}> \n*You have set notifications when aircraft type is something else than* `{not_special_ac}`"
+            notificationmessage_server = f"## Some special aircrafts coming! @everyone \n*You have set notifications when aircraft type is something else than* `{not_special_ac}`"
 
-        # Lisää maininta kaikille, jos lentokoneet eivät ole tietyn tyyppisiä
-        if any(message['actype'] not in usual_aircrafts for message in data):
-
-            notificationmessage_user = f"Some special aircrafts coming! <@{your_discord_id}> \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
-            notificationmessage_server = f"Some special aircrafts coming! @everyone \n*You have set notifications when aircraft type is something else than* `{usual_aircrafts}`"
-
-            #Poistetaan ylimääräisiä merkkejä
             notificationmessage_user = notificationmessage_user.replace("[", "").replace("]", "").replace("'", "")
             notificationmessage_server = notificationmessage_server.replace("[", "").replace("]", "").replace("'", "")
 
@@ -245,8 +278,6 @@ async def send_flight_data():
 
             channel = client.get_channel(your_channel_id)
             await channel.send(notificationmessage_server)
-
-        # Lähetä embed yksityisviestinä
 
         # Send the embed as a private message
         user = await client.fetch_user(your_discord_id)
@@ -265,16 +296,6 @@ async def send_flight_data():
         channel = client.get_channel(your_channel_id)
         await channel.send(message_no_data)
 
-async def create_flight_embed(flight_data):
-    embed = discord.Embed(color=0x00ff00)
-
-    # Lisää kentät embediin
-    embed.add_field(name="Flight", value=f"{flight_data['fltnr']} / {flight_data['callsign']}", inline=False)
-    embed.add_field(name="Route", value=f"{flight_data['h_apt']} -> {flight_data['route_1']}", inline=False)
-    embed.add_field(name="Time", value=f"{flight_data['sdt_timestamp_str_local']} UTC+2", inline=False)
-    embed.add_field(name="A/C", value=f"{flight_data['actype']} ({flight_data['acreg']})", inline=False)
-
-    embed.set_footer(text=f"{airport_code} Airport | Data from Finavia")
 
 
 #    # Hae kuvan URL rekisteritunnuksen perusteella
