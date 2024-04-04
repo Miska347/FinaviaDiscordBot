@@ -224,7 +224,7 @@ async def send_flight_data():
 
     if departure_data or arrival_data:
         # Create an empty embed
-        embed = discord.Embed(title=f"New flights ({airport_code})", color=0x00ff00)
+        embed = discord.Embed(title=f"New flights ({airport_code})", color=0x2e5fa9)
         embed.set_footer(text=f"{airport_code} Airport | Finland Time | Data from Finavia")
 
         # Check if you want to show all flights always
