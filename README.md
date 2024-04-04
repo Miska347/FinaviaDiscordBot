@@ -2,7 +2,7 @@
 Made with Python and discord.py
 Uses Finavia Public Flights, V0 API
 
-![Finavia Discord Bot Preview]([http://url/to/img.png](https://i.imgur.com/QySeMbv.png))
+![Finavia Discord Bot Preview](https://i.imgur.com/QySeMbv.png)
 
 ## Features:
 
