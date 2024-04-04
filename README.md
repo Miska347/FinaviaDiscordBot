@@ -1,5 +1,5 @@
 # FINAVIA DISCORD BOT
-Made with Python and discord.py
+Made with Python and discord.py,
 Uses Finavia Public Flights, V0 API
 
 ![Finavia Discord Bot Preview](https://i.imgur.com/QySeMbv.png)
